@@ -6,6 +6,26 @@ __pycache__/
 # C extensions
 *.so
 
+# Environments
+.venv/
+venv/
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# VS Code / PyCharm
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+
 # Distribution / packaging
 .Python
 build/
