@@ -1,23 +1,33 @@
 from dotenv import load_dotenv
-from langchain_together import TogetherEmbeddings
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import FAISS
 from youtube_transcript_api import YouTubeTranscriptApi
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts  import PromptTemplate
-from langchain_together import ChatTogether
-
+import os
 
 load_dotenv()
 
-embeddings = TogetherEmbeddings()
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
+# Directory to store FAISS indexes
+INDEX_DIR = "faiss_indexes"
+os.makedirs(INDEX_DIR, exist_ok=True)
+
 
 def create_vec_db_from_url(youtube_url: str) -> FAISS:
-    yt_api = YouTubeTranscriptApi()
     if "shorts" in youtube_url:
         video_id = youtube_url.split("shorts/")[1]
     else:
         video_id = youtube_url.split("v=")[1].split("&")[0]
+
+    index_path = os.path.join(INDEX_DIR, video_id)
+
+    if os.path.exists(index_path):
+        return FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
+
+    yt_api = YouTubeTranscriptApi()
     fetched_transcript = yt_api.fetch(video_id)
     full_text = " ".join([snippet.text for snippet in fetched_transcript])
     doc = Document(
@@ -32,14 +42,14 @@ def create_vec_db_from_url(youtube_url: str) -> FAISS:
     text_splitter = RecursiveCharacterTextSplitter(chunk_size =1000, chunk_overlap = 100)
     docs = text_splitter.split_documents([doc])
     db = FAISS.from_documents(docs, embeddings)
+    db.save_local(index_path)
     return db
 
 
 def get_response_from_query(db, query, k=8):
     documents = db.similarity_search(query, k)
     full_docs = " ".join([doc.page_content for doc in documents])
-    llm =  ChatTogether(model = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free")
-    # model_name = deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free
+    llm = ChatOpenAI(model="gpt-4o-mini")  
     prompt = PromptTemplate(
         input_variables= ["question", "docs"],
         template = """
